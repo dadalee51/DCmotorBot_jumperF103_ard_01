@@ -1,18 +1,17 @@
+#include <Wire.h>
 #include <Arduino.h>
+#define DEBUG
+
+#define I2C_SLAVE_ADDRESS 0x55
 // no MotorC port for this project
 void pwm_rgb(int a0, int a1, int a2);
 void set_rgb(int rgbarr[]);
 int rgbarr[] = {0, 0, 0};
 int rgbidx = 0;
 HardwareSerial hs = HardwareSerial(PB7, PB6);
-int a0 = 0;
-int a1 = 0;
-int a2 = 0;
+int a[6] = {0,0,0,0,0,0};
 int a5 = 0;
-
-int avg0 = 0;
-int avg1 = 0;
-int avg2 = 0;
+int avg[6] = {0,0,0,0,0,0};
 
 // long PWM_MANUAL =  12000;  //range of the pwm is from 0 to 12000 microseconds.
 long PWM_MANUAL = 1000;
@@ -83,8 +82,20 @@ void apwm_mb(int dir, int pwr)
   delayMicroseconds(PWM_MANUAL - pwr);
 }
 
-int minS[3] = {10000, 10000, 10000}; // sensor array min and max record
-int maxS[3] = {0, 0, 0};
+
+void receiveEvent(int byteCount) {
+  if (Wire.available() == 6) {  // Expect 6 bytes: 3 for motors, 3 for RGB
+    motorA_pwm = Wire.read();
+    motorB_pwm = Wire.read();
+    motorC_pwm = Wire.read();
+    red_pwm = Wire.read();
+    green_pwm = Wire.read();
+    blue_pwm = Wire.read();
+  }
+}
+
+int minS[6] = {10000, 10000, 10000,10000,10000,10000}; // sensor array min and max record
+int maxS[6] = {0, 0, 0, 0, 0, 0};
 
 void setup()
 {
@@ -99,14 +110,23 @@ void setup()
   pinMode(PB14, OUTPUT_OPEN_DRAIN);
   pinMode(PB15, OUTPUT_OPEN_DRAIN);
   pinMode(PB2, OUTPUT);       // turn on IR leds
-  pinMode(PA0, INPUT_ANALOG); // ir x3
-  pinMode(PA1, INPUT_ANALOG);
-  pinMode(PA2, INPUT_ANALOG);
+  pinMode(PA0, INPUT_ANALOG); // ir a1
+  pinMode(PA1, INPUT_ANALOG); //a2
+  pinMode(PA2, INPUT_ANALOG);//a3
+  pinMode(PA3, INPUT_ANALOG); // a4
+  pinMode(PA4, INPUT_ANALOG); // a5
   pinMode(PA5, INPUT_ANALOG); // SEN1
+  pinMode(PA6, INPUT_ANALOG); // SEN2
+  pinMode(PA7, INPUT_ANALOG); // a6
 
   digitalWrite(PB2, 1); // on ir led
   pwm_rgb(0xFF, 0xFF, 0xFF);
   hs.begin(115200);
+  // Initialize I2C as slave
+  Wire.begin(I2C_SLAVE_ADDRESS);
+  
+  // Register the receive event
+  Wire.onReceive(receiveEvent);
   delay(2000);
 
 
@@ -115,21 +135,24 @@ void setup()
   {  apwm_ma(-1, 500);
       apwm_mb(-1, 500);
     // record min and max
-    a0 = analogRead(PA0);
-    a1 = analogRead(PA1);
-    a2 = analogRead(PA2);
-    if (a0 < minS[0])
-      minS[0] = a0;
-    else if (a0 > maxS[0])
-      maxS[0] = a0;
-    if (a1 < minS[1])
-      minS[1] = a1;
-    else if (a1 > maxS[1])
-      maxS[1] = a1;
-    if (a2 < minS[2])
-      minS[2] = a2;
-    else if (a2 > maxS[2])
-      maxS[2] = a2;
+    a[0] = analogRead(PA0);
+    a[1] = analogRead(PA1);
+    a[2] = analogRead(PA2);
+    a[3] = analogRead(PA3);
+    a[4] = analogRead(PA4);
+    a[5] = analogRead(PA7);
+    if (a[0] < minS[0]) minS[0] = a[0];
+    else if (a[0] > maxS[0]) maxS[0] = a[0];
+    if (a[1] < minS[1]) minS[1] = a[1];
+    else if (a[1] > maxS[1]) maxS[1] = a[1];
+    if (a[2] < minS[2]) minS[2] = a[2];
+    else if (a[2] > maxS[2]) maxS[2] = a[2];
+    if (a[3] < minS[3]) minS[3] = a[3];
+    else if (a[3] > maxS[3]) maxS[3] = a[3];
+    if (a[4] < minS[4]) minS[4] = a[4];
+    else if (a[4] > maxS[4]) maxS[4] = a[4];
+    if (a[5] < minS[5]) minS[5] = a[5];
+    else if (a[5] > maxS[5]) maxS[5] = a[5];
   }
   move_ma(0);
   move_mb(0);
@@ -159,82 +182,51 @@ bool similar(int n0, int n1, int n2){
 
 void loop()
 {
-
-  // move_ma(1);
-  // move_mb(1);
-  // delay(2000);
-  // int step = PWM_MANUAL / 50;
-  // for(int i=0;i<PWM_MANUAL;i+=step){
-  //   apwm_ma(1,i);
-  //   apwm_mb(1,i);
-  // }
-  // for(int i=0;i<PWM_MANUAL;i+=step){
-  //   apwm_ma(1,PWM_MANUAL);
-  //   apwm_mb(1,PWM_MANUAL);
-  // }
-
-  // rgbidx++;
-  // if(rgbidx>100)rgbidx=0;
-  // rgbarr[0]=1;
-  // rgbarr[1]=1;
-  // rgbarr[2]=1;
-  // if(rgbidx%3==1)    rgbarr[0] = 0;
-  // if((rgbidx+1)%4==1)rgbarr[1] = 0;
-  // if((rgbidx+2)%5==1)rgbarr[2] = 0;
-  // set_rgb(rgbarr);
-  // delay(30);
-
-  a0 = analogRead(PA0);
-  a1 = analogRead(PA1);
-  a2 = analogRead(PA2);
-  avg0 = (minS[0] + maxS[0]) / 2;
-  avg1 = (minS[1] + maxS[1]) / 2;
-  avg2 = (minS[2] + maxS[2]) / 2;
+  a[0] = analogRead(PA0);
+  a[1] = analogRead(PA1);
+  a[2] = analogRead(PA2);
+  a[3] = analogRead(PA3);
+  a[4] = analogRead(PA4);
+  a[5] = analogRead(PA7);
+  for(int i=0;i<6;i++)avg[i] = (minS[i] + maxS[i]) / 2;
+  
   // a5 = analogRead(PA5);
   // hs.printf("%d\t%d\t%d\r\n",a0,a1,a2);
 
-  // int amp = PWM_MANUAL / 20;
-  // use 3 ir sensors to tell direction
-  // if(b0<b1 || b0<b2){ //left MB > MA
-  // apwm_ma(-1,a2 * amp);
-  // apwm_mb(-1,a0 * amp);
-  // }
-  // if(b1<b0 || b1<b2){// straight
-  //   apwm_ma(-1,500);
-  //   apwm_mb(-1,500);
-  // }
-  // if(b2<b1 || b2<b0){ //left MB > MA
-  //   apwm_ma(-1,1000);
-  //   apwm_mb(-1,100);
-  // }
-
-  if (in_range(maxS[0], minS[0], a0) &&
-      in_range(maxS[1], minS[1], a1) &&
-      in_range(maxS[2], minS[2], a2))
+  if (in_range(maxS[0], minS[0], a[0]) &&
+      in_range(maxS[1], minS[1], a[1]) &&
+      in_range(maxS[2], minS[2], a[2]) &&
+      in_range(maxS[3], minS[3], a[3]) &&
+      in_range(maxS[4], minS[4], a[4]) &&
+      in_range(maxS[5], minS[5], a[5]))
   {
     pwm_rgb(0xFF, 0xFF, 0xFF);
     // white is high, maxS, black is minS low
     // 0 ~ 1000
 
-    if(similar(a0, a1, a2)){
+    #ifdef DEBUG
+      return;
+    #endif
+
+    if(similar(a[0], a[1], a[2])){
       apwm_ma(-1, 1000);
       apwm_mb(-1, 1000);
       return;
     }
 
-    if(a0 < avg0){
+    if(a[0] < avg[0]){
       apwm_ma(-1, 500);
       apwm_mb(1, 500);
       return;
     }
 
-    if(a2 < avg2){
+    if(a[2] < avg[2]){
       apwm_ma(1, 500);
       apwm_mb(-1, 500);
       return;
     }
 
-    if(a1 < avg1){
+    if(a[1] < avg[1]){
       apwm_ma(-1, 600);
       apwm_mb(-1, 300);
     }else{
@@ -242,73 +234,10 @@ void loop()
       apwm_mb(-1, 600);
     }
     
-    // if (a0 < avg0 && a0 > minS[0]) apwm_ma(-1, 600);
-    // if (a2 < avg2 && a2 > minS[2]) apwm_mb(-1, 600);
-        // if (a1 > avg1)
-    //   {
-    //     apwm_ma(-1, 1000);
-    //     apwm_mb(-1, 100);
-    //   }
-    //   else
-    //   {
-    //     apwm_ma(-1, 100);
-    //     apwm_mb(-1, 1000);
-    //   }
-  }
-  else
-  {
-    // pwm_rgb(0xFF - a0 / 10, 0xFF - a1 / 10, 0xFF - a2 / 10);
-
-    // maxS[] is the white color and minS is the black color, anything lower than minS is too far away.
-    // use average of maxS and minS of [1] as middle point
+  } else {
+    
   }
 
-  // hs.printf("%d\t%d\t%d\t%d\r\n", a0, a1, a2, a5);
-  // pwm_rgb(a5, 0xff, 0xff);
-
-  // int prange = 1024;
-  // for (int i = 0; i < prange; i++)
-  // {
-  //    move_ma(1);
-  //    move_mb(1);
-  //    delayMicroseconds(prange-i);
-  //    move_ma(0);
-  //    move_mb(0);
-  //    delayMicroseconds(i);
-  // }
-
-  // for (int i = 255; i > 0; i--)
-  // {
-  //    move_ma(1);
-  //    move_mb(1);
-  //   delay(5);
-  // }
-  // for (int i = 0; i < 255; i++)
-  // {
-  //   // digitalWrite(PA15,0);
-  //   // analogWrite(PB3, i);
-  //   digitalWrite(PA_8,0);
-  //   analogWrite(PA_9, i);
-  //   delay(10);
-  // }
-  // for (int i = 0; i < 254; i++){
-  //     pwm_rgb(0xff,i,0xff);
-  //     delay(1);
-  // }
-
-  // This worked with direction
-  //  move_ma(1);
-  //  move_mb(-1);
-  //  delay(1000);
-  //  move_ma(0);
-  //  move_mb(0);
-  //  delay(1000);
-  //  move_ma(-1);
-  //  move_mb(1);
-  //  delay(1000);
-  //  move_mb(0);
-  //  move_ma(0);
-  //  delay(1000);
 }
 
 void set_rgb(int rgbarr[])
